@@ -11,7 +11,7 @@ interface Props {
   onXP?: () => void;
 }
 
-const STORAGE_KEY = 'ai-mindmap-flashcards-known';
+const STORAGE_KEY = 'mindmap-v2-flashcards-known';
 
 export default function FlashcardsPanel({ lang, isOpen, onOpenChange, onXP }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);

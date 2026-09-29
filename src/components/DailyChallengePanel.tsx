@@ -11,7 +11,7 @@ interface Props {
   onXP: (xp: number) => void;
 }
 
-const DAILY_KEY = 'ai-mindmap-daily-challenge';
+const DAILY_KEY = 'mindmap-v2-daily-challenge';
 
 interface DailyState {
   date: string;

@@ -371,7 +371,7 @@ const quizQuestions: QuizQuestion[] = [
   },
 ];
 
-const STORAGE_KEY = 'ai-mindmap-quiz';
+const STORAGE_KEY = 'mindmap-v2-quiz';
 
 interface QuizState {
   currentQuestion: number;

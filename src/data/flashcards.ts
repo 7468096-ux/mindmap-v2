@@ -16,7 +16,7 @@ export interface CardState {
   lastReview: number; // timestamp ms
 }
 
-const SM2_KEY = 'ai-mindmap-sm2';
+const SM2_KEY = 'mindmap-v2-sm2';
 
 export function loadSM2(): Record<string, CardState> {
   if (typeof window === 'undefined') return {};

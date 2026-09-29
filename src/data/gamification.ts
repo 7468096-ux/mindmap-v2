@@ -56,7 +56,7 @@ export interface StreakData {
   longestStreak: number;
 }
 
-const GAMIFICATION_KEY = 'ai-mindmap-gamification';
+const GAMIFICATION_KEY = 'mindmap-v2-gamification';
 
 export interface GamificationState {
   totalXP: number;

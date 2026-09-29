@@ -345,7 +345,7 @@ export function getQuizzesForBranch(nodeId: string): TopicQuiz[] {
 }
 
 // Check if quiz is passed
-const QUIZ_RESULTS_KEY = 'ai-mindmap-topic-quiz-results';
+const QUIZ_RESULTS_KEY = 'mindmap-v2-topic-quiz-results';
 
 export interface QuizResult {
   nodeId: string;

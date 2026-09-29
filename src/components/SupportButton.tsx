@@ -34,7 +34,7 @@ export default function SupportButton({ lang, isModal = false, onClose }: Props)
   const t = texts[lang];
 
   // basePath для GitHub Pages
-  const basePath = process.env.NODE_ENV === 'production' ? '/ai-mindmap' : '';
+  const basePath = process.env.NODE_ENV === 'production' ? '/mindmap-v2' : '';
   // Version for cache busting
   const version = 'v3';
   

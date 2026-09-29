@@ -2,14 +2,14 @@
 
 > Interactive visual map of AI/ML terminology for learning artificial intelligence
 
-[![Deploy](https://github.com/7468096-ux/ai-mindmap/actions/workflows/nextjs.yml/badge.svg)](https://github.com/7468096-ux/ai-mindmap/actions)
-[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://7468096-ux.github.io/ai-mindmap/)
+[![Deploy](https://github.com/7468096-ux/mindmap-v2/actions/workflows/deploy.yml/badge.svg)](https://github.com/7468096-ux/mindmap-v2/actions)
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://7468096-ux.github.io/mindmap-v2/)
 
 ## 🎯 About
 
 AI Mindmap is an educational tool for learning the hierarchy of artificial intelligence concepts. The project visualizes connections between concepts from high-level fields (AI, ML, DL) to specific implementations (GPT, BERT, YOLO).
 
-**Live Demo:** https://7468096-ux.github.io/ai-mindmap/
+**Live Demo:** https://7468096-ux.github.io/mindmap-v2/
 
 ## ✨ Features v1.0
 
@@ -94,8 +94,8 @@ AI (Artificial Intelligence)
 
 ```bash
 # Clone
-git clone https://github.com/7468096-ux/ai-mindmap.git
-cd ai-mindmap
+git clone https://github.com/7468096-ux/mindmap-v2.git
+cd mindmap-v2
 
 # Install dependencies
 npm install

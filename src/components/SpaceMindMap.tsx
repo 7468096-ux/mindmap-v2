@@ -144,7 +144,7 @@ function getManualPositions(): Map<string, { x: number; y: number }> {
   return positions;
 }
 
-const LEARNING_PROGRESS_KEY = 'ai-mindmap-learning-progress';
+const LEARNING_PROGRESS_KEY = 'mindmap-v2-learning-progress';
 
 interface LearningProgress {
   activePath: string | null;

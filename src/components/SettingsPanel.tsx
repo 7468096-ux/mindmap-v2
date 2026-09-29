@@ -23,11 +23,11 @@ export default function SettingsPanel({ lang, isOpen, onClose, onResetAll }: Pro
     }
     // Clear all localStorage
     const keys = [
-      'ai-mindmap-learning-progress',
-      'ai-mindmap-gamification',
-      'ai-mindmap-sm2',
-      'ai-mindmap-flashcards-known',
-      'ai-mindmap-quiz',
+      'mindmap-v2-learning-progress',
+      'mindmap-v2-gamification',
+      'mindmap-v2-sm2',
+      'mindmap-v2-flashcards-known',
+      'mindmap-v2-quiz',
     ];
     keys.forEach(k => localStorage.removeItem(k));
     onResetAll();
@@ -110,7 +110,7 @@ export default function SettingsPanel({ lang, isOpen, onClose, onResetAll }: Pro
               </div>
             </div>
             <a
-              href="https://github.com/7468096-ux/ai-mindmap"
+              href="https://github.com/7468096-ux/mindmap-v2"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 block text-center px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg text-sm transition-colors"
