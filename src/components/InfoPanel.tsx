@@ -7,6 +7,21 @@ import ComparisonTable from './ComparisonTable';
 import { getPathById } from '@/data/learningPaths';
 import { getQuizForNode, loadQuizResults } from '@/data/topicQuizzes';
 import LinkedText from './LinkedText';
+import { getPractical } from '@/data/practical';
+import { getRecipesForNode } from '@/data/recipes';
+
+// Render `code` spans inside plain text
+function InlineCode({ text }: { text: string }) {
+  return (
+    <>
+      {text.split('`').map((part, i) =>
+        i % 2 === 1
+          ? <code key={i} className="px-1 py-0.5 rounded bg-gray-950 text-emerald-300 font-mono text-[12px] break-words">{part}</code>
+          : <span key={i}>{part}</span>
+      )}
+    </>
+  );
+}
 
 interface InfoPanelProps {
   node: AINode | null;
@@ -18,14 +33,19 @@ interface InfoPanelProps {
   onNavigateNext?: (nodeId: string) => void;
   onStartExam?: (nodeId: string) => void;
   onNodeNavigate?: (nodeId: string) => void;
+  onOpenRecipe?: (recipeId: string) => void;
 }
 
-export default function InfoPanel({ node, lang, onClose, activePath, completedNodes = [], onMarkComplete, onNavigateNext, onStartExam, onNodeNavigate }: InfoPanelProps) {
+export default function InfoPanel({ node, lang, onClose, activePath, completedNodes = [], onMarkComplete, onNavigateNext, onStartExam, onNodeNavigate, onOpenRecipe }: InfoPanelProps) {
   if (!node) return null;
 
   const { emoji, level } = node.data;
   const content = node.data[lang];
   const analogy = node.data.analogy;
+  const practicalContent = getPractical(node.id, lang);
+  const useCases = practicalContent?.useCases ?? content.useCases;
+  const whenToUse = practicalContent?.whenToUse ?? content.whenToUse;
+  const nodeRecipes = getRecipesForNode(node.id);
   const color = levelColors[level];
   
   const DemoComponent = getDemo(node.id);
@@ -55,6 +75,7 @@ export default function InfoPanel({ node, lang, onClose, activePath, completedNo
       
       {/* Desktop: side panel. Mobile: bottom sheet */}
       <div 
+        data-no-pan
         className="fixed inset-x-0 bottom-0 md:inset-x-auto md:bottom-auto md:absolute md:right-4 md:top-4 md:w-[420px] bg-gray-900 md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden z-50 max-h-[70vh] md:max-h-[90vh] overflow-y-auto"
         onMouseDown={stopPropagation}
         onMouseMove={stopPropagation}
@@ -130,6 +151,72 @@ export default function InfoPanel({ node, lang, onClose, activePath, completedNo
         </p>
       </div>
       
+      {/* Used in tasks */}
+      {nodeRecipes.length > 0 && (
+        <div className="p-4 border-b border-gray-800 bg-gradient-to-r from-purple-900/20 to-transparent">
+          <h3 className="text-purple-300 text-xs uppercase tracking-wide mb-2">
+            🧩 {lang === 'ru' ? 'Применяется в задачах' : 'Used to build'}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {nodeRecipes.map(r => (
+              <button
+                key={r.id}
+                onClick={() => onOpenRecipe?.(r.id)}
+                className="px-2.5 py-1 rounded-lg text-xs text-purple-100 bg-purple-600/20 border border-purple-500/30 hover:bg-purple-600/40 transition-colors"
+              >
+                {r.emoji} {r.title[lang]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Use Cases */}
+      {useCases && useCases.length > 0 && (
+        <div className="p-4 border-b border-gray-800">
+          <h3 className="text-gray-400 text-xs uppercase tracking-wide mb-3">
+            🌍 {lang === 'ru' ? 'Где применяется' : 'Real-World Use Cases'}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {useCases.map((useCase, i) => (
+              <span key={i} className="px-2 py-1 bg-gray-800 text-gray-300 text-xs rounded-full">
+                {useCase}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* When to Use */}
+      {whenToUse && (
+        <div className="p-4 border-b border-gray-800">
+          <h3 className="text-gray-400 text-xs uppercase tracking-wide mb-3">
+            🎯 {lang === 'ru' ? 'Когда брать' : 'When to Use'}
+          </h3>
+          <p className="text-gray-300 text-sm leading-relaxed">
+            <LinkedText text={whenToUse} onTermClick={(id) => onNodeNavigate?.(id)} currentNodeId={node.id} />
+          </p>
+        </div>
+      )}
+
+      {/* Data needed + Try it */}
+      {practicalContent && (
+        <div className="p-4 border-b border-gray-800 space-y-3">
+          <div>
+            <h3 className="text-gray-400 text-xs uppercase tracking-wide mb-1.5">
+              📦 {lang === 'ru' ? 'Какие нужны данные' : 'Data You Need'}
+            </h3>
+            <p className="text-gray-300 text-sm leading-relaxed">{practicalContent.dataNeeded}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-emerald-900/15 border border-emerald-700/30">
+            <h3 className="text-emerald-400 text-xs uppercase tracking-wide mb-1.5">
+              🚀 {lang === 'ru' ? 'Попробовать за 10 минут' : 'Try It in 10 Minutes'}
+            </h3>
+            <p className="text-gray-200 text-sm leading-relaxed"><InlineCode text={practicalContent.tryIt} /></p>
+          </div>
+        </div>
+      )}
+
       {/* Key Points */}
       <div className="p-4 border-b border-gray-800">
         <h3 className="text-gray-400 text-xs uppercase tracking-wide mb-3">
@@ -153,34 +240,6 @@ export default function InfoPanel({ node, lang, onClose, activePath, completedNo
           <LinkedText text={content.howItWorks} onTermClick={(id) => onNodeNavigate?.(id)} currentNodeId={node.id} />
         </p>
       </div>
-      
-      {/* Use Cases */}
-      {content.useCases && content.useCases.length > 0 && (
-        <div className="p-4 border-b border-gray-800">
-          <h3 className="text-gray-400 text-xs uppercase tracking-wide mb-3">
-            🌍 {lang === 'ru' ? 'Где применяется' : 'Real-World Use Cases'}
-          </h3>
-          <div className="flex flex-wrap gap-2">
-            {content.useCases.map((useCase, i) => (
-              <span key={i} className="px-2 py-1 bg-gray-800 text-gray-300 text-xs rounded-full">
-                {useCase}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {/* When to Use */}
-      {content.whenToUse && (
-        <div className="p-4 border-b border-gray-800">
-          <h3 className="text-gray-400 text-xs uppercase tracking-wide mb-3">
-            🎯 {lang === 'ru' ? 'Когда использовать' : 'When to Use'}
-          </h3>
-          <p className="text-gray-300 text-sm leading-relaxed">
-            <LinkedText text={content.whenToUse} onTermClick={(id) => onNodeNavigate?.(id)} currentNodeId={node.id} />
-          </p>
-        </div>
-      )}
       
       {/* Code Example */}
       {content.codeExample && (

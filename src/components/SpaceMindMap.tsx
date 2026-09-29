@@ -24,6 +24,9 @@ import GlossaryPanel from './GlossaryPanel';
 import DailyChallengePanel from './DailyChallengePanel';
 import ModelComparisonPanel from './ModelComparisonPanel';
 import ConceptRelationsPanel from './ConceptRelationsPanel';
+import RecipesPanel from './RecipesPanel';
+import RecipeBar from './RecipeBar';
+import { getRecipeById, getRecipeNodeIds } from '@/data/recipes';
 
 interface SpaceNode {
   id: string;
@@ -145,6 +148,7 @@ function getManualPositions(): Map<string, { x: number; y: number }> {
 }
 
 const LEARNING_PROGRESS_KEY = 'mindmap-v2-learning-progress';
+const RECIPES_SEEN_KEY = 'mindmap-v2-recipes-seen';
 
 interface LearningProgress {
   activePath: string | null;
@@ -211,6 +215,13 @@ export default function SpaceMindMap() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeExam, setActiveExam] = useState<TopicQuiz | null>(null);
   const [activeTopicQuiz, setActiveTopicQuiz] = useState<TopicQuiz | null>(null);
+  // Recipes: task-first entry point
+  const [recipeView, setRecipeView] = useState<string | null>(null);
+  const [activeRecipe, setActiveRecipe] = useState<string | null>(null);
+  const activeRecipeNodeIds = useMemo(() => {
+    const recipe = activeRecipe ? getRecipeById(activeRecipe) : undefined;
+    return recipe ? getRecipeNodeIds(recipe) : [];
+  }, [activeRecipe]);
   
   // Gamification
   const [gamification, setGamification] = useState<GamificationState>(loadGamification());
@@ -247,8 +258,9 @@ export default function SpaceMindMap() {
         path.nodeIds.forEach(id => visible.add(id));
       }
     }
+    activeRecipeNodeIds.forEach(id => visible.add(id));
     return visible;
-  }, [expandedNodes, expandAll, childrenMap, activePath]);
+  }, [expandedNodes, expandAll, childrenMap, activePath, activeRecipeNodeIds]);
 
   // Count hidden children for badge
   const getHiddenChildCount = useCallback((nodeId: string): number => {
@@ -276,6 +288,16 @@ export default function SpaceMindMap() {
   useEffect(() => {
     saveLearningProgress({ activePath, completedNodes });
   }, [activePath, completedNodes]);
+
+  // First visit: start from tasks, not from theory
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem(RECIPES_SEEN_KEY)) {
+        setOpenPanel('recipes');
+        localStorage.setItem(RECIPES_SEEN_KEY, '1');
+      }
+    } catch {}
+  }, []);
 
   const handleResetProgress = () => {
     setActivePath(null);
@@ -482,6 +504,7 @@ export default function SpaceMindMap() {
   const targetZoom = useRef(zoom);
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
+      if ((e.target as HTMLElement).closest('[data-no-pan]')) return; // let panels scroll
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.08 : 0.08;
       targetZoom.current = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, targetZoom.current + delta));
@@ -507,7 +530,7 @@ export default function SpaceMindMap() {
 
   useEffect(() => {
     const handleTouchStart = (e: TouchEvent) => {
-      if ((e.target as HTMLElement).closest('.space-node')) return;
+      if ((e.target as HTMLElement).closest('.space-node') || (e.target as HTMLElement).closest('[data-no-pan]')) return;
       if (e.touches.length === 1) handlePanStart(e.touches[0].clientX, e.touches[0].clientY);
     };
     const handleTouchMove = (e: TouchEvent) => {
@@ -607,6 +630,65 @@ export default function SpaceMindMap() {
     }
   };
 
+  // Move the camera so the given nodes fit in the free area: below the header,
+  // and left of the info panel on desktop when one is about to be shown
+  const fitNodes = useCallback((ids: string[], fitZoom: boolean, withInfoPanel: boolean) => {
+    const points = ids.map(id => nodePositions.get(id)).filter((p): p is { x: number; y: number } => !!p);
+    if (points.length === 0) return;
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    const NODE_W = 150, NODE_H = 60;
+    const minX = Math.min(...points.map(p => p.x));
+    const maxX = Math.max(...points.map(p => p.x)) + NODE_W;
+    const minY = Math.min(...points.map(p => p.y));
+    const maxY = Math.max(...points.map(p => p.y)) + NODE_H;
+    const isDesktop = W >= 768;
+    const areaW = W - (isDesktop && withInfoPanel ? 440 : 0);
+    const areaTop = isDesktop ? 210 : 310; // header, recipe bar
+    const areaBottom = isDesktop ? H - 40 : (withInfoPanel ? H * 0.3 + 140 : H - 120); // mobile: bottom sheet / legend
+    let z = targetZoom.current;
+    if (fitZoom) {
+      z = Math.min(0.9, (areaW - 80) / (maxX - minX), (areaBottom - areaTop - 60) / (maxY - minY));
+      z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+      targetZoom.current = z;
+    }
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const targetX = areaW / 2;
+    const targetY = (areaTop + areaBottom) / 2;
+    setPan({ x: targetX - W / 2 - (cx - W / 2) * z, y: targetY - H / 2 - (cy - H / 2) * z });
+  }, [nodePositions]);
+
+  const focusNode = useCallback((nodeId: string) => {
+    const node = dataNodes.find(n => n.id === nodeId);
+    if (!node) return;
+    setSelectedNode(node);
+    const parentEdge = initialEdges.find(e => e.target === nodeId && !e.style?.strokeDasharray);
+    if (parentEdge) setExpandedNodes(prev => { const next = new Set(prev); next.add(parentEdge.source); return next; });
+    fitNodes([nodeId], false, true);
+  }, [fitNodes]);
+
+  const openRecipe = useCallback((recipeId: string | null) => {
+    setRecipeView(recipeId);
+    setOpenPanel('recipes');
+  }, []);
+
+  const handleRecipeNode = useCallback((nodeId: string, recipeId: string) => {
+    setActiveRecipe(recipeId);
+    setOpenPanel(null);
+    focusNode(nodeId);
+  }, [focusNode]);
+
+  const handleShowRecipeOnMap = useCallback((recipeId: string) => {
+    const recipe = getRecipeById(recipeId);
+    if (!recipe) return;
+    const ids = getRecipeNodeIds(recipe);
+    setActiveRecipe(recipeId);
+    setOpenPanel(null);
+    setSelectedNode(null);
+    fitNodes(ids, true, false);
+  }, [fitNodes]);
+
   const handleSearchSelect = useCallback((node: AINode) => {
     setSelectedNode(node);
     // Ensure node is visible
@@ -618,7 +700,8 @@ export default function SpaceMindMap() {
         return next;
       });
     }
-  }, []);
+    fitNodes([node.id], false, true);
+  }, [fitNodes]);
 
   return (
     <div ref={containerRef} className={`space-container ${isPanning ? 'panning' : ''}`}>
@@ -650,9 +733,9 @@ export default function SpaceMindMap() {
       ))}
 
       {/* Header: Title + Language + XP */}
-      <div className="absolute top-4 left-4 z-50 flex flex-col gap-3" data-no-pan>
+      <div className="absolute top-4 left-4 z-50 flex flex-col gap-3 max-w-[calc(100vw-7.5rem)] md:max-w-none" data-no-pan>
         <div className="bg-gray-950/40 backdrop-blur-xl rounded-2xl border border-white/[0.06] px-5 py-3.5 shadow-2xl">
-          <div className="flex items-start gap-4">
+          <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
             <div className="text-white">
               <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2 tracking-tight">
                 <span className="text-2xl md:text-3xl">🧠</span>
@@ -664,6 +747,12 @@ export default function SpaceMindMap() {
             </div>
             <LanguageToggle lang={lang} onChange={setLang} />
           </div>
+          <button
+            onClick={() => openRecipe(null)}
+            className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-purple-600/90 to-fuchsia-600/90 hover:from-purple-500 hover:to-fuchsia-500 shadow-lg shadow-purple-900/30 transition-all"
+          >
+            🧩 {lang === 'ru' ? 'Решить задачу с AI' : 'Solve a task with AI'}
+          </button>
           <div className="mt-2.5 pt-2.5 border-t border-white/[0.06]">
             <XPBar lang={lang} state={gamification} />
           </div>
@@ -827,7 +916,7 @@ export default function SpaceMindMap() {
         {/* Nodes */}
         {nodes.map((node) => {
           const isDragging = draggingNodeId === node.id;
-          const isInActivePath = activePath ? getPathById(activePath)?.nodeIds.includes(node.id) : false;
+          const isInActivePath = (activePath ? getPathById(activePath)?.nodeIds.includes(node.id) : false) || activeRecipeNodeIds.includes(node.id);
           const isCompleted = completedNodes.includes(node.id);
           const hiddenCount = getHiddenChildCount(node.id);
           
@@ -902,6 +991,7 @@ export default function SpaceMindMap() {
         onMarkComplete={handleMarkComplete}
         onNavigateNext={handleNavigateNext}
         onStartExam={handleStartExam}
+        onOpenRecipe={(recipeId) => openRecipe(recipeId)}
         onNodeNavigate={(nodeId) => {
           const node = dataNodes.find(n => n.id === nodeId);
           if (node) {
@@ -930,6 +1020,24 @@ export default function SpaceMindMap() {
         onXP={(xp) => setGamification(prev => { const s = { ...prev, totalXP: prev.totalXP + xp }; saveGamification(s); return s; })} />
       <ModelComparisonPanel lang={lang} isOpen={openPanel === 'models'} onClose={() => setOpenPanel(null)} />
       <ConceptRelationsPanel lang={lang} isOpen={openPanel === 'relations'} onClose={() => setOpenPanel(null)} />
+
+      <RecipeBar
+        lang={lang}
+        recipeId={activeRecipe}
+        selectedNodeId={selectedNode?.id ?? null}
+        onNodeClick={focusNode}
+        onOpenRecipe={(id) => openRecipe(id)}
+        onClose={() => setActiveRecipe(null)}
+      />
+      <RecipesPanel
+        lang={lang}
+        isOpen={openPanel === 'recipes'}
+        recipeId={recipeView}
+        onSelectRecipe={setRecipeView}
+        onClose={() => setOpenPanel(null)}
+        onOpenNode={handleRecipeNode}
+        onShowOnMap={handleShowRecipeOnMap}
+      />
 
       {openPanel === 'support' && <SupportButton lang={lang} isModal onClose={() => setOpenPanel(null)} />}
     </div>

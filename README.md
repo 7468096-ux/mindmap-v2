@@ -11,6 +11,17 @@ AI Mindmap is an educational tool for learning the hierarchy of artificial intel
 
 **Live Demo:** https://7468096-ux.github.io/mindmap-v2/
 
+## 🧩 Start from the task (v2)
+
+The main entry point is **"Solve a task with AI"**: pick what you want to build and see how to assemble it from the map's components.
+
+- **7 task recipes:** chatbot over documents (RAG), semantic search, text classification, object recognition in photos/video, forecasting, image generation, an assistant that takes actions
+- **Each recipe has:** a step-by-step pipeline linked to map nodes, three ways to build it (ready-made API / open-source / your own fine-tuned model) with concrete tools, the data you need, difficulty/cost/time to MVP, and common pitfalls
+- **"Show on the map"** highlights the recipe's components and walks through them
+- **Practical block in nodes:** where it is used, when to pick it (and what to pick instead), the data it needs, and how to try it in 10 minutes; each node also links back to the tasks it is used in
+
+Content lives in `src/data/recipes.ts` and `src/data/practical.ts`.
+
 ## ✨ Features v1.0
 
 ### Content

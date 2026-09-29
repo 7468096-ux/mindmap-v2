@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Language } from '@/data/nodes';
 import { GamificationState, getLevel } from '@/data/gamification';
 
-export type PanelId = 'paths' | 'flashcards' | 'quiz' | 'support' | 'stats' | 'settings' | 'timeline' | 'glossary' | 'daily' | 'models' | 'relations' | null;
+export type PanelId = 'recipes' | 'paths' | 'flashcards' | 'quiz' | 'support' | 'stats' | 'settings' | 'timeline' | 'glossary' | 'daily' | 'models' | 'relations' | null;
 
 interface Props {
   lang: Language;
@@ -49,6 +49,7 @@ export default function ToolbarMenu({
   const level = getLevel(gamification.totalXP);
 
   const menuItems: MenuItem[] = [
+    { id: 'recipes', emoji: '🧩', label: { en: 'Solve a Task with AI', ru: 'Решить задачу с AI' }, section: lang === 'ru' ? 'Применение' : 'Apply', dividerAfter: true },
     { id: 'paths', emoji: '📚', label: { en: 'Learning Paths', ru: 'Пути изучения' }, section: lang === 'ru' ? 'Обучение' : 'Learn' },
     { id: 'flashcards', emoji: '🎴', label: { en: 'Flashcards (SM-2)', ru: 'Карточки (SM-2)' }, badge: dueCards > 0 ? dueCards : undefined },
     { id: 'quiz', emoji: '📝', label: { en: 'Mini-Quiz', ru: 'Мини-тест' } },
