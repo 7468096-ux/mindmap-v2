@@ -3,63 +3,41 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 8, 8, 24;
-  --background-end-rgb: 8, 8, 24;
+  --sky: #13233A;      /* фон */
+  --pocket: #1C3050;   /* панели */
+  --chalk: #E9E3D0;    /* звёзды, основной текст */
+  --mist: #93A4BC;     /* вторичный текст, линии созвездий */
+  --grid: #3A5274;     /* сетка, рамка, разделители */
+  --brass: #D4A95A;    /* выбор, главное действие, фокус */
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-start-rgb));
+  color: var(--chalk);
+  background: var(--sky);
+  font-family: 'Golos Text', system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Selection */
 ::selection {
-  background: rgba(139, 92, 246, 0.3);
-  color: white;
+  background: rgba(212, 169, 90, 0.35);
+  color: var(--chalk);
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 5px;
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--grid); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--mist); }
 
-::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.2);
-  border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.4);
-}
-
-/* React Flow customizations */
-.react-flow__node {
-  cursor: pointer !important;
-}
-
-.react-flow__edge-path {
-  stroke-linecap: round;
-}
-
-.react-flow__controls {
-  background: #1f2937 !important;
-  border: 1px solid #374151 !important;
-  border-radius: 8px !important;
-}
-
-.react-flow__controls-button {
-  background: #1f2937 !important;
-  border-bottom: 1px solid #374151 !important;
-  fill: #9ca3af !important;
-}
-
-.react-flow__controls-button:hover {
-  background: #374151 !important;
-}
+/* React Flow customizations (legacy MindMap) */
+.react-flow__node { cursor: pointer !important; }
+.react-flow__edge-path { stroke-linecap: round; }
+.react-flow__controls { background: var(--pocket) !important; border: 1px solid var(--grid) !important; border-radius: 4px !important; }
+.react-flow__controls-button { background: var(--pocket) !important; border-bottom: 1px solid var(--grid) !important; fill: var(--mist) !important; }
+.react-flow__controls-button:hover { background: var(--grid) !important; }

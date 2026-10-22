@@ -9,26 +9,28 @@ interface LanguageToggleProps {
 
 export default function LanguageToggle({ lang, onChange }: LanguageToggleProps) {
   return (
-    <div className="flex bg-gray-800 rounded-lg p-1 gap-1">
+    <div className="flex border border-atlas-grid rounded-[4px] text-xs">
       <button
         onClick={() => onChange('ru')}
-        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+        aria-pressed={lang === 'ru'}
+        className={`px-2 py-1 font-medium transition-colors ${
           lang === 'ru' 
-            ? 'bg-indigo-600 text-white' 
-            : 'text-gray-400 hover:text-white'
+            ? 'bg-atlas-chalk text-atlas-sky' 
+            : 'text-atlas-mist hover:text-atlas-chalk'
         }`}
       >
-        🇷🇺 RU
+        RU
       </button>
       <button
         onClick={() => onChange('en')}
-        className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+        aria-pressed={lang === 'en'}
+        className={`px-2 py-1 font-medium transition-colors ${
           lang === 'en' 
-            ? 'bg-indigo-600 text-white' 
-            : 'text-gray-400 hover:text-white'
+            ? 'bg-atlas-chalk text-atlas-sky' 
+            : 'text-atlas-mist hover:text-atlas-chalk'
         }`}
       >
-        🇬🇧 EN
+        EN
       </button>
     </div>
   );

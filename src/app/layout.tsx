@@ -1,8 +1,11 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import '@fontsource/golos-text/400.css'
+import '@fontsource/golos-text/500.css'
+import '@fontsource/golos-text/600.css'
+import '@fontsource/alegreya/400.css'
+import '@fontsource/alegreya/400-italic.css'
+import '@fontsource/alegreya/500-italic.css'
 import './globals.css'
-
-const inter = Inter({ subsets: ['latin', 'cyrillic'] })
 
 export const metadata: Metadata = {
   title: 'AI Mindmap — Интерактивная карта AI терминологии',
@@ -16,7 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru">
-      <body className={inter.className}>{children}</body>
+      <body className="font-sans">{children}</body>
     </html>
   )
 }

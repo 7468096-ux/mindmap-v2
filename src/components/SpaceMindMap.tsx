@@ -14,7 +14,7 @@ import ToolbarMenu, { PanelId } from './ToolbarMenu';
 import StatsPanel from './StatsPanel';
 import SettingsPanel from './SettingsPanel';
 import TopicQuizModal from './TopicQuizModal';
-import { initialNodes as dataNodes, initialEdges, AINode, Language, levelColors, levelLabels, AbstractionLevel } from '@/data/nodes';
+import { initialNodes as dataNodes, initialEdges, AINode, Language, levelLabels, AbstractionLevel } from '@/data/nodes';
 import { getPathById } from '@/data/learningPaths';
 import { GamificationState, loadGamification, awardXP, saveGamification } from '@/data/gamification';
 import { getDueCount, flashcardsData, loadSM2 } from '@/data/flashcards';
@@ -31,7 +31,6 @@ import { getRecipeById, getRecipeNodeIds } from '@/data/recipes';
 interface SpaceNode {
   id: string;
   name: string;
-  emoji: string;
   level: AbstractionLevel;
   x: number;
   y: number;
@@ -44,46 +43,41 @@ interface Connection {
   dashed?: boolean;
 }
 
-// Star generation
-function generateStars(count: number, seed: number) {
-  const stars = [];
+// Faint background stars, fixed to the screen (no parallax)
+function generateDust(count: number, seed: number) {
+  const stars: { x: number; y: number; r: number; o: number }[] = [];
   let s = seed;
   const random = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
   for (let i = 0; i < 10; i++) random();
   for (let i = 0; i < count; i++) {
-    stars.push({ x: random() * 200 - 50, y: random() * 200 - 50 });
+    const m = random();
+    stars.push({ x: random() * 100, y: random() * 100, r: m > 0.93 ? 2 : m > 0.7 ? 1.4 : 1, o: 0.12 + random() * 0.28 });
   }
   return stars;
 }
+const dust = generateDust(160, 7);
 
-const starLayers = [
-  { stars: generateStars(60, 1), size: 0.8, speed: 140, opacity: 0.3 },
-  { stars: generateStars(50, 2), size: 1, speed: 120, opacity: 0.4 },
-  { stars: generateStars(45, 3), size: 1.3, speed: 100, opacity: 0.5 },
-  { stars: generateStars(35, 4), size: 1.8, speed: 80, opacity: 0.6 },
-  { stars: generateStars(30, 5), size: 2.2, speed: 60, opacity: 0.7 },
-  { stars: generateStars(25, 6), size: 2.8, speed: 40, opacity: 0.8 },
-  { stars: generateStars(15, 7), size: 3.5, speed: 25, opacity: 0.9 },
-  { stars: generateStars(10, 8), size: 4.5, speed: 15, opacity: 1 },
-  { stars: generateStars(5, 9), size: 6, speed: 8, opacity: 1 },
-];
+// Star magnitude order: field is the 1st magnitude
+const magnitude: Record<AbstractionLevel, number> = { field: 0, theory: 1, method: 2, algorithm: 3, implementation: 4 };
+const magnitudeGlyph: Record<AbstractionLevel, number> = { field: 16, theory: 11, method: 8, algorithm: 6, implementation: 4 };
+// Zoom below which a magnitude's label is hidden (shown on hover / selection)
+const labelZoom: Record<AbstractionLevel, number> = { field: 0, theory: 0, method: 0.34, algorithm: 0.5, implementation: 0.58 };
 
-interface ShootingStar {
-  id: number;
-  startX: number;
-  startY: number;
-  angle: number;
-  length: number;
-  speed: number;
+// The tree is drawn top-down on landscape screens and left-to-right on portrait ones
+function isLandscape() {
+  return typeof window !== 'undefined' && window.innerWidth > window.innerHeight;
 }
 
-const spaceColors: Record<AbstractionLevel, string> = {
-  field: '#6366f1',
-  theory: '#8b5cf6',
-  method: '#06b6d4',
-  algorithm: '#10b981',
-  implementation: '#f59e0b',
-};
+function getAtlasPositions(): Map<string, { x: number; y: number }> {
+  const base = getManualPositions();
+  const out = new Map<string, { x: number; y: number }>();
+  const landscape = isLandscape();
+  base.forEach((p, id) => {
+    // portrait: lift the root above the first branch so its label stays clear
+    out.set(id, landscape ? { x: p.y * 1.7, y: p.x * 1.6 } : (id === 'ai' ? { x: 0, y: 0 } : { x: p.x * 0.9, y: p.y + 300 }));
+  });
+  return out;
+}
 
 // Manual positions for beautiful tree layout
 function getManualPositions(): Map<string, { x: number; y: number }> {
@@ -210,7 +204,6 @@ export default function SpaceMindMap() {
   const initialProgress = loadLearningProgress();
   const [activePath, setActivePath] = useState<string | null>(initialProgress.activePath);
   const [completedNodes, setCompletedNodes] = useState<string[]>(initialProgress.completedNodes);
-  const [smoothTilt, setSmoothTilt] = useState({ x: 0, y: 0 });
   const [openPanel, setOpenPanel] = useState<PanelId>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeExam, setActiveExam] = useState<TopicQuiz | null>(null);
@@ -356,9 +349,6 @@ export default function SpaceMindMap() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const targetTilt = useRef({ x: 0, y: 0 });
-  const animationRef = useRef<number>();
-  
   const connections = useMemo<Connection[]>(() => 
     initialEdges.map(edge => ({
       from: edge.source,
@@ -368,7 +358,7 @@ export default function SpaceMindMap() {
     []
   );
   
-  const initialPositions = useMemo(() => getManualPositions(), []);
+  const initialPositions = useMemo(() => getAtlasPositions(), []);
   const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(initialPositions);
   
   const nodes = useMemo<SpaceNode[]>(() => 
@@ -379,7 +369,6 @@ export default function SpaceMindMap() {
         return {
           id: node.id,
           name: node.data[lang]?.label || node.id,
-          emoji: node.data.emoji || '📦',
           level: node.data.level,
           x: pos.x,
           y: pos.y,
@@ -389,9 +378,6 @@ export default function SpaceMindMap() {
     [lang, nodePositions, visibleNodeIds]
   );
 
-  const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [nodeSizes, setNodeSizes] = useState<Map<string, { width: number; height: number }>>(new Map());
-  
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panStart = useRef({ x: 0, y: 0 });
@@ -399,49 +385,14 @@ export default function SpaceMindMap() {
   const containerRef = useRef<HTMLDivElement>(null);
   
   const [zoom, setZoom] = useState(0.65);
-  const MIN_ZOOM = 0.2;
+  const [intro, setIntro] = useState(true);
+  const [landscape] = useState(isLandscape);
+  const MIN_ZOOM = 0.12;
   const MAX_ZOOM = 2;
   
   const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
   const dragStart = useRef({ x: 0, y: 0 });
   const nodeStartPos = useRef({ x: 0, y: 0 });
-
-  const [shootingStars, setShootingStars] = useState<ShootingStar[]>([]);
-  const shootingStarId = useRef(0);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const sizes = new Map<string, { width: number; height: number }>();
-      nodeRefs.current.forEach((el, id) => {
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          sizes.set(id, { width: rect.width / zoom, height: rect.height / zoom });
-        }
-      });
-      setNodeSizes(sizes);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [nodes, zoom]);
-
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    const createShootingStar = () => {
-      const startX = -20 + Math.random() * 140;
-      const startY = -20 + Math.random() * 100;
-      const star: ShootingStar = {
-        id: shootingStarId.current++,
-        startX, startY,
-        angle: 30 + Math.random() * 30,
-        length: 150 + Math.random() * 200,
-        speed: 2 + Math.random() * 1.5,
-      };
-      setShootingStars(prev => [...prev, star]);
-      setTimeout(() => setShootingStars(prev => prev.filter(s => s.id !== star.id)), star.speed * 1000 + 500);
-      timeoutId = setTimeout(createShootingStar, 10000 + Math.random() * 20000);
-    };
-    timeoutId = setTimeout(createShootingStar, 2000 + Math.random() * 3000);
-    return () => clearTimeout(timeoutId);
-  }, []);
 
   // Node drag handlers
   const handleNodeDragStart = useCallback((nodeId: string, clientX: number, clientY: number) => {
@@ -553,31 +504,6 @@ export default function SpaceMindMap() {
     };
   }, [isPanning, draggingNodeId, handlePanStart, handlePanMove, handlePanEnd, handleNodeDragMove, handleNodeDragEnd]);
 
-  useEffect(() => {
-    const smoothing = () => {
-      setSmoothTilt(prev => ({
-        x: prev.x + (targetTilt.current.x - prev.x) * 0.08,
-        y: prev.y + (targetTilt.current.y - prev.y) * 0.08,
-      }));
-      animationRef.current = requestAnimationFrame(smoothing);
-    };
-    animationRef.current = requestAnimationFrame(smoothing);
-    const handleMouseMove = (event: MouseEvent) => {
-      if (isPanning || draggingNodeId) return;
-      targetTilt.current = {
-        x: (event.clientX / window.innerWidth - 0.5) * 2,
-        y: (event.clientY / window.innerHeight - 0.5) * 2,
-      };
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
-  }, [isPanning, draggingNodeId]);
-
-  const getNodeById = (id: string) => nodes.find(n => n.id === id);
-  const getNodeSize = (id: string) => nodeSizes.get(id) || { width: 130, height: 70 };
   
   const getPathToRoot = useCallback((nodeId: string | null): string[] => {
     if (!nodeId) return [];
@@ -599,12 +525,6 @@ export default function SpaceMindMap() {
     const toIndex = pathToRoot.indexOf(conn.to);
     return fromIndex !== -1 && toIndex !== -1 && Math.abs(fromIndex - toIndex) === 1;
   }, [selectedNode, getPathToRoot]);
-
-  // Visible connections (both ends must be visible)
-  const visibleConnections = useMemo(() => 
-    connections.filter(c => visibleNodeIds.has(c.from) && visibleNodeIds.has(c.to)),
-    [connections, visibleNodeIds]
-  );
 
   const handleNodeClick = (node: SpaceNode, wasDragging: boolean) => {
     if (wasDragging) return;
@@ -632,25 +552,26 @@ export default function SpaceMindMap() {
 
   // Move the camera so the given nodes fit in the free area: below the header,
   // and left of the info panel on desktop when one is about to be shown
-  const fitNodes = useCallback((ids: string[], fitZoom: boolean, withInfoPanel: boolean) => {
+  const fitNodes = useCallback((ids: string[], fitZoom: boolean, withInfoPanel: boolean, instant = false) => {
     const points = ids.map(id => nodePositions.get(id)).filter((p): p is { x: number; y: number } => !!p);
     if (points.length === 0) return;
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const NODE_W = 150, NODE_H = 60;
+    const NODE_W = 160, NODE_H = 40; // star + label to its right
     const minX = Math.min(...points.map(p => p.x));
     const maxX = Math.max(...points.map(p => p.x)) + NODE_W;
     const minY = Math.min(...points.map(p => p.y));
     const maxY = Math.max(...points.map(p => p.y)) + NODE_H;
     const isDesktop = W >= 768;
     const areaW = W - (isDesktop && withInfoPanel ? 440 : 0);
-    const areaTop = isDesktop ? 210 : 310; // header, recipe bar
-    const areaBottom = isDesktop ? H - 40 : (withInfoPanel ? H * 0.3 + 140 : H - 120); // mobile: bottom sheet / legend
+    const areaTop = isDesktop ? 150 : 200; // header
+    const areaBottom = isDesktop ? H - 72 : (withInfoPanel ? H * 0.3 + 140 : H - 96); // mobile: bottom sheet / legend
     let z = targetZoom.current;
     if (fitZoom) {
       z = Math.min(0.9, (areaW - 80) / (maxX - minX), (areaBottom - areaTop - 60) / (maxY - minY));
       z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
       targetZoom.current = z;
+      if (instant) setZoom(z);
     }
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
@@ -658,6 +579,29 @@ export default function SpaceMindMap() {
     const targetY = (areaTop + areaBottom) / 2;
     setPan({ x: targetX - W / 2 - (cx - W / 2) * z, y: targetY - H / 2 - (cy - H / 2) * z });
   }, [nodePositions]);
+
+  // First screen: the whole atlas fits the free area (left of the task column on desktop)
+  const fitAll = useCallback((recipesDocked: boolean, instant = false) => {
+    fitNodes(dataNodes.map(n => n.id), true, recipesDocked && window.innerWidth >= 768, instant);
+  }, [fitNodes]);
+  const firstVisit = useRef<boolean | null>(null);
+  if (firstVisit.current === null) {
+    try { firstVisit.current = typeof window !== 'undefined' && !localStorage.getItem(RECIPES_SEEN_KEY); } catch { firstVisit.current = false; }
+  }
+  useEffect(() => {
+    fitAll(!!firstVisit.current, true);
+    const t = setTimeout(() => setIntro(false), 1800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Re-frame the atlas when the docked task column opens or closes on desktop
+  const recipesOpen = openPanel === 'recipes';
+  const prevRecipesOpen = useRef(recipesOpen);
+  useEffect(() => {
+    if (prevRecipesOpen.current === recipesOpen) return;
+    prevRecipesOpen.current = recipesOpen;
+    if (window.innerWidth >= 768 && !selectedNode && !activeRecipe) fitAll(recipesOpen);
+  }, [recipesOpen, selectedNode, activeRecipe, fitAll]);
 
   const focusNode = useCallback((nodeId: string) => {
     const node = dataNodes.find(n => n.id === nodeId);
@@ -704,56 +648,34 @@ export default function SpaceMindMap() {
   }, [fitNodes]);
 
   return (
-    <div ref={containerRef} className={`space-container ${isPanning ? 'panning' : ''}`}>
-      {/* Stars */}
-      {starLayers.map((layer, i) => {
-        const zoomFactor = 1 + (zoom - 0.65) * (0.1 + i * 0.08);
-        return (
-          <div key={i} className="star-layer" style={{
-            transform: `translate(${smoothTilt.x * layer.speed + pan.x * (0.1 + i * 0.05)}px, ${smoothTilt.y * layer.speed + pan.y * (0.1 + i * 0.05)}px) scale(${zoomFactor})`,
-            transition: 'transform 0.3s ease-out',
-          }}>
-            {layer.stars.map((star, j) => (
-              <div key={j} className="star" style={{
-                left: `${star.x}%`, top: `${star.y}%`,
-                width: `${layer.size}px`, height: `${layer.size}px`,
-                opacity: layer.opacity,
-              }} />
-            ))}
-          </div>
-        );
-      })}
-
-      {/* Shooting stars */}
-      {shootingStars.map(star => (
-        <div key={star.id} className="shooting-star" style={{
-          left: `${star.startX}%`, top: `${star.startY}%`,
-          '--angle': `${star.angle}deg`, '--length': `${star.length}px`, '--speed': `${star.speed}s`,
-        } as React.CSSProperties} />
-      ))}
+    <div ref={containerRef} className={`space-container ${isPanning ? 'panning' : ''} ${intro ? 'intro' : ''} ${landscape ? 'orient-landscape' : ''}`}>
+      {/* Background dust + plate frame */}
+      <div className="atlas-dust" aria-hidden>
+        {dust.map((d, i) => (
+          <span key={i} style={{ left: `${d.x}%`, top: `${d.y}%`, width: d.r, height: d.r, opacity: d.o }} />
+        ))}
+      </div>
+      <div className="atlas-frame" aria-hidden />
 
       {/* Header: Title + Language + XP */}
-      <div className="absolute top-4 left-4 z-50 flex flex-col gap-3 max-w-[calc(100vw-7.5rem)] md:max-w-none" data-no-pan>
-        <div className="bg-gray-950/40 backdrop-blur-xl rounded-2xl border border-white/[0.06] px-5 py-3.5 shadow-2xl">
-          <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-            <div className="text-white">
-              <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2 tracking-tight">
-                <span className="text-2xl md:text-3xl">🧠</span>
-                <span className="bg-gradient-to-r from-white via-purple-100 to-purple-300 bg-clip-text text-transparent">AI Mindmap</span>
-              </h1>
-              <p className="text-gray-500 text-[11px] md:text-xs mt-0.5 tracking-wide">
-                {lang === 'ru' ? 'Кликни для описания • ⌘K поиск' : 'Click for details • ⌘K search'}
+      <div className="absolute top-5 left-5 md:top-6 md:left-6 z-50 w-[calc(100vw-6.5rem)] max-w-[300px]" data-no-pan>
+        <div className="bg-atlas-sky/90 border border-atlas-grid rounded-[6px] px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h1 className="font-atlas italic text-2xl md:text-[28px] leading-none text-atlas-chalk">AI Mindmap</h1>
+              <p className="hidden md:block text-atlas-mist text-xs mt-1.5">
+                {lang === 'ru' ? 'Нажми на звезду, чтобы прочитать. Поиск: ⌘K' : 'Click a star to read about it. Search: ⌘K'}
               </p>
             </div>
             <LanguageToggle lang={lang} onChange={setLang} />
           </div>
           <button
             onClick={() => openRecipe(null)}
-            className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-purple-600/90 to-fuchsia-600/90 hover:from-purple-500 hover:to-fuchsia-500 shadow-lg shadow-purple-900/30 transition-all"
+            className="mt-2.5 md:mt-3 w-full px-3 py-2 rounded-[4px] text-sm font-medium bg-atlas-brass text-atlas-sky hover:bg-[#E0B96E] transition-colors"
           >
-            🧩 {lang === 'ru' ? 'Решить задачу с AI' : 'Solve a task with AI'}
+            {lang === 'ru' ? 'Решить задачу с AI' : 'Solve a task with AI'}
           </button>
-          <div className="mt-2.5 pt-2.5 border-t border-white/[0.06]">
+          <div className="mt-2.5 pt-2.5 md:mt-3 md:pt-3 border-t border-atlas-grid">
             <XPBar lang={lang} state={gamification} />
           </div>
         </div>
@@ -830,102 +752,69 @@ export default function SpaceMindMap() {
         transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, 
         transformOrigin: 'center center' 
       }}>
-        {/* SVG connections */}
+        {/* SVG: coordinate grid + constellation lines (world units) */}
         <svg className="connections" style={{
           position: 'absolute', left: '-2000px', top: '-2000px',
-          width: '6000px', height: '6000px', overflow: 'visible',
-        }}>
-          <defs>
-            <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
-              <stop offset="30%" stopColor="#8b5cf6" stopOpacity="0.5" />
-              <stop offset="50%" stopColor="#a855f7" stopOpacity="0.6" />
-              <stop offset="70%" stopColor="#8b5cf6" stopOpacity="0.5" />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.3" />
-            </linearGradient>
-            <linearGradient id="activeLineGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.7" />
-              <stop offset="50%" stopColor="#c084fc" stopOpacity="1" />
-              <stop offset="100%" stopColor="#a855f7" stopOpacity="0.7" />
-            </linearGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
-              <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-            <filter id="softGlow">
-              <feGaussianBlur stdDeviation="4" result="blur"/>
-              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
-          
-          {visibleConnections.map((conn, i) => {
-            const from = getNodeById(conn.from);
-            const to = getNodeById(conn.to);
-            if (!from || !to) return null;
-            
-            const fromSize = getNodeSize(from.id);
-            const toSize = getNodeSize(to.id);
-            const startX = from.x + fromSize.width + 2000;
-            const startY = from.y + fromSize.height / 2 + 2000;
-            const endX = to.x + 2000;
-            const endY = to.y + toSize.height / 2 + 2000;
-            const dx = Math.abs(endX - startX);
-            const tension = Math.max(dx * 0.4, 50);
-            const pathD = `M ${startX} ${startY} C ${startX + tension} ${startY}, ${endX - tension} ${endY}, ${endX} ${endY}`;
-            const pathId = `path-${i}`;
-            const isActive = isConnectionActive(conn);
-            
-            return (
-              <g key={i}>
-                {/* Background glow for active lines */}
-                {isActive && (
-                  <path d={pathD}
-                    stroke="#a855f7" strokeWidth={8}
-                    fill="none" opacity={0.1} filter="url(#softGlow)"
-                  />
-                )}
-                <path id={pathId} d={pathD}
-                  stroke={isActive ? 'url(#activeLineGradient)' : 'url(#lineGradient)'}
-                  strokeWidth={isActive ? 2 : 1.5}
-                  strokeDasharray={conn.dashed ? '6,6' : undefined}
-                  fill="none" filter={isActive ? 'url(#glow)' : undefined}
-                  className={`connection-line ${isActive ? 'active' : ''}`}
-                />
-                {isActive && (() => {
-                  const baseOffset = (i * 1.7) % 5;
-                  const glow = 'drop-shadow(0 0 4px #fff) drop-shadow(0 0 8px #a855f7) drop-shadow(0 0 15px #a855f7) drop-shadow(0 0 25px #8b5cf6)';
-                  return (
-                    <>
-                      <circle r="2.5" fill="white" style={{ filter: glow }}>
-                        <animateMotion dur="5s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" begin={`${baseOffset}s`}><mpath href={`#${pathId}`} /></animateMotion>
-                      </circle>
-                      <circle r="2.5" fill="white" style={{ filter: glow }}>
-                        <animateMotion dur="5s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" begin={`${baseOffset + 1.6}s`}><mpath href={`#${pathId}`} /></animateMotion>
-                      </circle>
-                      <circle r="2.5" fill="white" style={{ filter: glow }}>
-                        <animateMotion dur="5s" repeatCount="indefinite" keyPoints="1;0" keyTimes="0;1" calcMode="linear" begin={`${baseOffset + 3.3}s`}><mpath href={`#${pathId}`} /></animateMotion>
-                      </circle>
-                    </>
-                  );
-                })()}
+          width: '10000px', height: '10000px', overflow: 'visible',
+        }} aria-hidden>
+          <g className="atlas-grid">
+            {Array.from({ length: 21 }, (_, i) => -2000 + i * 500).map(v => (
+              <g key={v}>
+                <line x1={v + 2000} y1={0} x2={v + 2000} y2={10000} vectorEffect="non-scaling-stroke" strokeWidth={1} />
+                <line x1={0} y1={v + 2000} x2={10000} y2={v + 2000} vectorEffect="non-scaling-stroke" strokeWidth={1} />
               </g>
+            ))}
+          </g>
+          {connections.map((conn, i) => {
+            const fromVisible = visibleNodeIds.has(conn.from);
+            const toVisible = visibleNodeIds.has(conn.to);
+            const from = nodePositions.get(conn.from);
+            const to = nodePositions.get(conn.to);
+            if (!from || !to) return null;
+            const ghost = !(fromVisible && toVisible);
+            if (ghost && conn.dashed) return null;
+            const isActive = !ghost && isConnectionActive(conn);
+            return (
+              <line key={i}
+                x1={from.x + 2000} y1={from.y + 2000} x2={to.x + 2000} y2={to.y + 2000}
+                vectorEffect="non-scaling-stroke"
+                strokeWidth={isActive ? 1.75 : 1}
+                strokeDasharray={conn.dashed ? '3 5' : undefined}
+                className={`constellation-line ${conn.dashed ? 'dashed' : ''} ${ghost ? 'ghost' : ''} ${isActive ? 'active' : ''}`}
+              />
             );
           })}
         </svg>
 
-        {/* Nodes */}
+        {/* Hidden stars: faint points, so the whole constellation is visible from the start */}
+        {dataNodes.filter(n => !visibleNodeIds.has(n.id)).map(n => {
+          const pos = nodePositions.get(n.id);
+          if (!pos) return null;
+          return (
+            <div key={`ghost-${n.id}`} className={`ghost-star mag-${n.data.level}`}
+              style={{ left: pos.x, top: pos.y, '--inv': 1 / zoom, '--mag-i': magnitude[n.data.level] } as React.CSSProperties}>
+              <span className="star-dot" style={{ width: magnitudeGlyph[n.data.level] * 0.7, height: magnitudeGlyph[n.data.level] * 0.7, left: -magnitudeGlyph[n.data.level] * 0.35, top: -magnitudeGlyph[n.data.level] * 0.35 }} />
+            </div>
+          );
+        })}
+
+        {/* Stars */}
         {nodes.map((node) => {
           const isDragging = draggingNodeId === node.id;
           const isInActivePath = (activePath ? getPathById(activePath)?.nodeIds.includes(node.id) : false) || activeRecipeNodeIds.includes(node.id);
           const isCompleted = completedNodes.includes(node.id);
+          const isSelected = selectedNode?.id === node.id;
           const hiddenCount = getHiddenChildCount(node.id);
+          const labelOff = zoom < labelZoom[node.level] && !isSelected && !isInActivePath;
           
           return (
             <div
               key={node.id}
-              ref={(el) => { if (el) nodeRefs.current.set(node.id, el); }}
-              className={`space-node ${selectedNode?.id === node.id ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${isInActivePath ? 'in-path' : ''} ${isCompleted ? 'completed' : ''}`}
-              style={{ left: `${node.x}px`, top: `${node.y}px`, '--level-color': spaceColors[node.level] } as React.CSSProperties}
+              role="button"
+              tabIndex={0}
+              aria-label={node.name}
+              className={`space-node mag-${node.level} ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${isInActivePath ? 'in-path' : ''} ${isCompleted ? 'completed' : ''} ${labelOff ? 'label-off' : ''}`}
+              style={{ left: `${node.x}px`, top: `${node.y}px`, '--inv': 1 / zoom, '--mag-i': magnitude[node.level] } as React.CSSProperties}
               onMouseDown={(e) => { e.stopPropagation(); handleNodeDragStart(node.id, e.clientX, e.clientY); }}
               onTouchStart={(e) => { e.stopPropagation(); if (e.touches.length === 1) handleNodeDragStart(node.id, e.touches[0].clientX, e.touches[0].clientY); }}
               onClick={(e) => { 
@@ -933,41 +822,37 @@ export default function SpaceMindMap() {
                 const wasDragging = Math.abs(e.clientX - dragStart.current.x) > 5 || Math.abs(e.clientY - dragStart.current.y) > 5;
                 handleNodeClick(node, wasDragging); 
               }}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNodeClick(node, false); } }}
             >
-              <div className="node-glow"></div>
-              <div className="node-content">
-                <span className="node-icon">{node.emoji}</span>
-                <span className="node-name">{node.name}</span>
-                {/* Hidden children badge */}
-                {hiddenCount > 0 && (
-                  <span className="absolute -bottom-2 -right-2 bg-purple-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg">
-                    +{hiddenCount > 99 ? '99' : hiddenCount}
-                  </span>
-                )}
-              </div>
+              <span className="star-hit" />
+              <span className="star-dot" />
+              <span className="star-label">
+                {node.name}
+                {hiddenCount > 0 && <span className="star-more">+{hiddenCount > 99 ? '99' : hiddenCount}</span>}
+              </span>
             </div>
           );
         })}
       </div>
 
-      {/* Legend + Expand toggle */}
-      <div className="absolute bottom-4 left-4 bg-gray-950/40 backdrop-blur-xl rounded-2xl p-3.5 text-xs z-50 max-w-[300px] border border-white/[0.06] shadow-2xl" data-no-pan>
-        <div className="text-gray-500 mb-2.5 uppercase tracking-wider text-[10px] font-medium flex items-center justify-between">
-          <span>{lang === 'ru' ? 'Уровень абстракции' : 'Abstraction Level'}</span>
-          <button
-            onClick={() => setExpandAll(!expandAll)}
-            className="text-purple-400 hover:text-purple-300 transition-colors normal-case text-xs"
-          >
-            {expandAll ? (lang === 'ru' ? '📁 Свернуть' : '📁 Collapse') : (lang === 'ru' ? '📂 Показать все' : '📂 Show All')}
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-1.5">
-          {(Object.keys(levelColors) as Array<AbstractionLevel>).map((level) => (
-            <span key={level} className="flex items-center gap-1.5 text-gray-400">
-              <span className="w-2.5 h-2.5 rounded-full shadow-lg" style={{ backgroundColor: levelColors[level], boxShadow: `0 0 8px ${levelColors[level]}40` }} />
-              <span className="text-[11px]">{levelLabels[lang][level]}</span>
+      {/* Magnitude scale: the abstraction levels, as on an atlas legend */}
+      <div className="absolute z-50 left-3 bottom-3 md:left-6 md:bottom-6" data-no-pan>
+        <div title={(Object.keys(magnitude) as Array<AbstractionLevel>).map(l => levelLabels[lang][l]).join(', ')}
+          className="inline-flex items-center gap-x-3 md:gap-x-5 whitespace-nowrap bg-atlas-sky/90 border border-atlas-grid rounded-[6px] px-3 py-2 md:px-4 text-[13px] text-atlas-mist">
+          {(Object.keys(magnitude) as Array<AbstractionLevel>).map((level) => (
+            <span key={level} className="flex items-center gap-2">
+              <span className="relative inline-flex items-center justify-center" style={{ width: 16, height: 16 }}>
+                <span className="rounded-full bg-atlas-chalk" style={{ width: magnitudeGlyph[level], height: magnitudeGlyph[level] }} />
+              </span>
+              <span className="hidden sm:inline">{levelLabels[lang][level]}</span>
             </span>
           ))}
+          <button
+            onClick={() => setExpandAll(!expandAll)}
+            className="ml-1 pl-4 border-l border-atlas-grid text-atlas-chalk hover:text-atlas-brass transition-colors"
+          >
+            {expandAll ? (lang === 'ru' ? 'Свернуть' : 'Collapse') : (lang === 'ru' ? 'Показать все' : 'Show all')}
+          </button>
         </div>
       </div>
 
