@@ -9,11 +9,67 @@
 }
 
 body {
+  font-family: 'Segoe UI Variable Text', 'Segoe UI Variable', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter Variable', system-ui, sans-serif;
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-start-rgb));
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Fluent 2 tokens (dark) */
+:root {
+  --acrylic: rgba(30, 28, 50, 0.72);
+  --acrylic-strong: rgba(28, 26, 46, 0.88);
+  --stroke: rgba(255, 255, 255, 0.08);
+  --stroke-hover: rgba(255, 255, 255, 0.16);
+  --highlight: rgba(255, 255, 255, 0.06);
+  --accent: #a78bfa;           /* filled accent controls */
+  --accent-hover: #b9a1fb;
+  --on-accent: #1b1033;
+  --ease-fluent: cubic-bezier(0.1, 0.9, 0.2, 1);
+}
+
+:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Fluent acrylic surface */
+.fluent-acrylic {
+  background: var(--acrylic);
+  backdrop-filter: blur(30px) saturate(150%);
+  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  border: 1px solid var(--stroke);
+  box-shadow: inset 0 1px 0 var(--highlight), 0 8px 16px rgba(0,0,0,0.28), 0 0 2px rgba(0,0,0,0.24);
+}
+
+/* Fluent accent button */
+.fluent-accent-btn {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-radius: 4px;
+  font-weight: 600;
+  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.2);
+  transition: background-color 0.15s ease;
+}
+.fluent-accent-btn:hover { background: var(--accent-hover); }
+.fluent-accent-btn:active { background: #9576f0; box-shadow: none; }
+
+/* Fluent subtle button */
+.fluent-subtle-btn {
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+.fluent-subtle-btn:hover { background: rgba(255,255,255,0.06); }
+.fluent-subtle-btn:active { background: rgba(255,255,255,0.04); }
+
+@keyframes fluentIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+.fluent-enter { animation: fluentIn 0.3s var(--ease-fluent) both; }
+@media (prefers-reduced-motion: reduce) { .fluent-enter { animation: none; } }
 
 /* Selection */
 ::selection {

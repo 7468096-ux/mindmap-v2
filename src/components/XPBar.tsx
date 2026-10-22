@@ -1,4 +1,5 @@
 'use client';
+import { Trophy16Regular, Fire16Filled } from '@fluentui/react-icons';
 
 import { Language } from '@/data/nodes';
 import { GamificationState, getLevel, getNextLevel, getLevelProgress } from '@/data/gamification';
@@ -18,23 +19,22 @@ export default function XPBar({ lang, state }: Props) {
     <div className="flex items-center gap-3 text-xs">
       {/* Level badge */}
       <div className="flex items-center gap-1.5 shrink-0">
-        <span className="text-base drop-shadow-lg">{level.emoji}</span>
-        <span className="text-gray-300 font-semibold tracking-wide">
+        <Trophy16Regular className="text-amber-300" aria-hidden />
+        <span className="text-white/90 font-semibold">
           {lang === 'ru' ? level.nameRu : level.name}
         </span>
       </div>
 
       {/* XP Bar */}
       <div className="flex items-center gap-2 min-w-[110px] flex-1">
-        <div className="flex-1 h-[5px] bg-white/[0.06] rounded-full overflow-hidden">
+        <div className="flex-1 h-1 bg-white/[0.1] rounded-full overflow-hidden" role="progressbar" aria-valuenow={Math.round(progress)} aria-valuemin={0} aria-valuemax={100}>
           <div
-            className="h-full rounded-full bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 transition-all duration-700 ease-out relative"
+            className="h-full rounded-full bg-gradient-to-r from-violet-400 to-fuchsia-400 transition-all duration-700 ease-out"
             style={{ width: `${Math.max(progress, 2)}%` }}
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
           </div>
         </div>
-        <span className="text-gray-500 tabular-nums whitespace-nowrap text-[10px] font-mono">
+        <span className="text-white/55 tabular-nums whitespace-nowrap text-[11px]">
           {state.totalXP}{nextLevel ? `/${nextLevel.minXP}` : ''}
         </span>
       </div>
@@ -42,7 +42,7 @@ export default function XPBar({ lang, state }: Props) {
       {/* Streak */}
       {streak > 0 && (
         <div className="flex items-center gap-0.5 shrink-0">
-          <span className="text-sm">🔥</span>
+          <Fire16Filled className="text-orange-400" aria-hidden />
           <span className="text-orange-400 font-bold text-[11px]">{streak}</span>
         </div>
       )}

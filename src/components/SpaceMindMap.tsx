@@ -27,6 +27,7 @@ import ConceptRelationsPanel from './ConceptRelationsPanel';
 import RecipesPanel from './RecipesPanel';
 import RecipeBar from './RecipeBar';
 import { getRecipeById, getRecipeNodeIds } from '@/data/recipes';
+import { BrainCircuit24Regular, PuzzlePiece20Regular, ArrowExpand20Regular, ArrowMinimize20Regular } from '@fluentui/react-icons';
 
 interface SpaceNode {
   id: string;
@@ -368,7 +369,12 @@ export default function SpaceMindMap() {
     []
   );
   
-  const initialPositions = useMemo(() => getManualPositions(), []);
+  // Cards are compact, so the hand-made layout is tightened vertically
+  const initialPositions = useMemo(() => {
+    const m = getManualPositions();
+    m.forEach((p, id) => m.set(id, { x: p.x, y: Math.round(p.y * 0.72) }));
+    return m;
+  }, []);
   const [nodePositions, setNodePositions] = useState<Map<string, { x: number; y: number }>>(initialPositions);
   
   const nodes = useMemo<SpaceNode[]>(() => 
@@ -637,27 +643,35 @@ export default function SpaceMindMap() {
     if (points.length === 0) return;
     const W = window.innerWidth;
     const H = window.innerHeight;
-    const NODE_W = 150, NODE_H = 60;
+    const NODE_W = 230, NODE_H = 72;
     const minX = Math.min(...points.map(p => p.x));
     const maxX = Math.max(...points.map(p => p.x)) + NODE_W;
     const minY = Math.min(...points.map(p => p.y));
     const maxY = Math.max(...points.map(p => p.y)) + NODE_H;
     const isDesktop = W >= 768;
     const areaW = W - (isDesktop && withInfoPanel ? 440 : 0);
-    const areaTop = isDesktop ? 210 : 310; // header, recipe bar
-    const areaBottom = isDesktop ? H - 40 : (withInfoPanel ? H * 0.3 + 140 : H - 120); // mobile: bottom sheet / legend
+    const areaLeft = isDesktop ? 360 : 0; // header card
+    const areaTop = isDesktop ? 120 : 250; // header, recipe bar
+    const areaBottom = isDesktop ? H - 110 : (withInfoPanel ? H * 0.3 + 140 : H - 130); // mobile: bottom sheet / legend
     let z = targetZoom.current;
     if (fitZoom) {
-      z = Math.min(0.9, (areaW - 80) / (maxX - minX), (areaBottom - areaTop - 60) / (maxY - minY));
+      z = Math.min(0.9, (areaW - areaLeft - 80) / (maxX - minX), (areaBottom - areaTop - 60) / (maxY - minY));
       z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
       targetZoom.current = z;
     }
     const cx = (minX + maxX) / 2;
     const cy = (minY + maxY) / 2;
-    const targetX = areaW / 2;
+    const targetX = (areaLeft + areaW) / 2;
     const targetY = (areaTop + areaBottom) / 2;
     setPan({ x: targetX - W / 2 - (cx - W / 2) * z, y: targetY - H / 2 - (cy - H / 2) * z });
   }, [nodePositions]);
+
+  // First screen: frame the root and the first two branches at a readable scale
+  useEffect(() => {
+    const t = setTimeout(() => fitNodes(['ai', 'ml', 'dl'], true, false), 50);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const focusNode = useCallback((nodeId: string) => {
     const node = dataNodes.find(n => n.id === nodeId);
@@ -733,27 +747,28 @@ export default function SpaceMindMap() {
       ))}
 
       {/* Header: Title + Language + XP */}
-      <div className="absolute top-4 left-4 z-50 flex flex-col gap-3 max-w-[calc(100vw-7.5rem)] md:max-w-none" data-no-pan>
-        <div className="bg-gray-950/40 backdrop-blur-xl rounded-2xl border border-white/[0.06] px-5 py-3.5 shadow-2xl">
-          <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-            <div className="text-white">
-              <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2 tracking-tight">
-                <span className="text-2xl md:text-3xl">🧠</span>
-                <span className="bg-gradient-to-r from-white via-purple-100 to-purple-300 bg-clip-text text-transparent">AI Mindmap</span>
-              </h1>
-              <p className="text-gray-500 text-[11px] md:text-xs mt-0.5 tracking-wide">
-                {lang === 'ru' ? 'Кликни для описания • ⌘K поиск' : 'Click for details • ⌘K search'}
+      <div className="absolute top-4 left-4 z-50 w-[calc(100vw-6.5rem)] max-w-[320px]" data-no-pan>
+        <div className="fluent-acrylic rounded-xl p-4">
+          <div className="flex items-center gap-3">
+            <span className="shrink-0 w-10 h-10 rounded-lg grid place-items-center text-white bg-gradient-to-br from-violet-500 to-fuchsia-600 shadow-fluent4">
+              <BrainCircuit24Regular />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-white text-lg md:text-xl font-semibold leading-tight tracking-tight whitespace-nowrap">AI Mindmap</h1>
+              <p className="text-white/60 text-xs mt-0.5 hidden md:block">
+                {lang === 'ru' ? 'Нажми на узел для описания · ⌘K поиск' : 'Click a node for details · ⌘K search'}
               </p>
             </div>
             <LanguageToggle lang={lang} onChange={setLang} />
           </div>
           <button
             onClick={() => openRecipe(null)}
-            className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-purple-600/90 to-fuchsia-600/90 hover:from-purple-500 hover:to-fuchsia-500 shadow-lg shadow-purple-900/30 transition-all"
+            className="fluent-accent-btn mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 text-sm"
           >
-            🧩 {lang === 'ru' ? 'Решить задачу с AI' : 'Solve a task with AI'}
+            <PuzzlePiece20Regular />
+            {lang === 'ru' ? 'Решить задачу с AI' : 'Solve a task with AI'}
           </button>
-          <div className="mt-2.5 pt-2.5 border-t border-white/[0.06]">
+          <div className="mt-3 pt-3 border-t border-white/[0.08]">
             <XPBar lang={lang} state={gamification} />
           </div>
         </div>
@@ -936,11 +951,14 @@ export default function SpaceMindMap() {
             >
               <div className="node-glow"></div>
               <div className="node-content">
-                <span className="node-icon">{node.emoji}</span>
-                <span className="node-name">{node.name}</span>
+                <span className="node-icon" aria-hidden>{node.emoji}</span>
+                <span className="node-text">
+                  <span className="node-name">{node.name}</span>
+                  <span className="node-level">{levelLabels[lang][node.level]}</span>
+                </span>
                 {/* Hidden children badge */}
                 {hiddenCount > 0 && (
-                  <span className="absolute -bottom-2 -right-2 bg-purple-600 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg">
+                  <span className="node-badge" aria-label={lang === 'ru' ? `ещё ${hiddenCount}` : `${hiddenCount} more`}>
                     +{hiddenCount > 99 ? '99' : hiddenCount}
                   </span>
                 )}
@@ -951,21 +969,22 @@ export default function SpaceMindMap() {
       </div>
 
       {/* Legend + Expand toggle */}
-      <div className="absolute bottom-4 left-4 bg-gray-950/40 backdrop-blur-xl rounded-2xl p-3.5 text-xs z-50 max-w-[300px] border border-white/[0.06] shadow-2xl" data-no-pan>
-        <div className="text-gray-500 mb-2.5 uppercase tracking-wider text-[10px] font-medium flex items-center justify-between">
-          <span>{lang === 'ru' ? 'Уровень абстракции' : 'Abstraction Level'}</span>
+      <div className="absolute bottom-4 left-4 right-4 md:right-auto z-50 fluent-acrylic rounded-xl px-4 py-3 md:max-w-[340px]" data-no-pan>
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <span className="text-white/70 text-xs font-semibold">{lang === 'ru' ? 'Уровень абстракции' : 'Abstraction level'}</span>
           <button
             onClick={() => setExpandAll(!expandAll)}
-            className="text-purple-400 hover:text-purple-300 transition-colors normal-case text-xs"
+            className="fluent-subtle-btn -mr-2 flex items-center gap-1.5 px-2 py-1 text-xs text-violet-300 hover:text-violet-200"
           >
-            {expandAll ? (lang === 'ru' ? '📁 Свернуть' : '📁 Collapse') : (lang === 'ru' ? '📂 Показать все' : '📂 Show All')}
+            {expandAll ? <ArrowMinimize20Regular className="w-4 h-4" /> : <ArrowExpand20Regular className="w-4 h-4" />}
+            {expandAll ? (lang === 'ru' ? 'Свернуть' : 'Collapse') : (lang === 'ru' ? 'Показать все' : 'Show all')}
           </button>
         </div>
-        <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+        <div className="flex flex-wrap gap-x-3.5 gap-y-1.5">
           {(Object.keys(levelColors) as Array<AbstractionLevel>).map((level) => (
-            <span key={level} className="flex items-center gap-1.5 text-gray-400">
-              <span className="w-2.5 h-2.5 rounded-full shadow-lg" style={{ backgroundColor: levelColors[level], boxShadow: `0 0 8px ${levelColors[level]}40` }} />
-              <span className="text-[11px]">{levelLabels[lang][level]}</span>
+            <span key={level} className="flex items-center gap-1.5 text-white/80 text-xs">
+              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: levelColors[level], boxShadow: `0 0 8px ${levelColors[level]}` }} />
+              {levelLabels[lang][level]}
             </span>
           ))}
         </div>
